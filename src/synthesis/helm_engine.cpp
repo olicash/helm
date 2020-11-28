@@ -31,6 +31,7 @@
 namespace mopo {
 
   HelmEngine::HelmEngine() : was_playing_arp_(false) {
+    mtsClient = MTS_RegisterClient();
     init();
     bps_ = controls_["beats_per_minute"];
   }
@@ -38,6 +39,7 @@ namespace mopo {
   HelmEngine::~HelmEngine() {
     while (mod_connections_.size())
       disconnectModulation(*mod_connections_.begin());
+    MTS_DeregisterClient(mtsClient);
   }
 
   void HelmEngine::init() {
@@ -53,7 +55,7 @@ namespace mopo {
     // Voice Handler.
     Output* polyphony = createMonoModControl("polyphony", true);
 
-    voice_handler_ = new HelmVoiceHandler(beats_per_second_clamped->output());
+    voice_handler_ = new HelmVoiceHandler(beats_per_second_clamped->output(), mtsClient);
     addSubmodule(voice_handler_);
     voice_handler_->setPolyphony(32);
     voice_handler_->plug(polyphony, VoiceHandler::kPolyphony);
@@ -382,6 +384,7 @@ namespace mopo {
   }
 
   void HelmEngine::noteOn(mopo_float note, mopo_float velocity, int sample, int channel) {
+    if (MTS_ShouldFilterNote(mtsClient,note,channel)) return;
     if (arp_on_->value())
       arpeggiator_->noteOn(note, velocity, sample);
     else

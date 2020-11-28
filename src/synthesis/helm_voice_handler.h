@@ -46,7 +46,7 @@ namespace mopo {
   // contained in here.
   class HelmVoiceHandler : public virtual VoiceHandler, public virtual HelmModule {
     public:
-      HelmVoiceHandler(Output* beats_per_second);
+      HelmVoiceHandler(Output* beats_per_second, struct MTSClient *mtsc);
       virtual ~HelmVoiceHandler() { } // Should probably delete things.
 
       void init() override;
@@ -66,7 +66,7 @@ namespace mopo {
     private:
       // Create the portamento, legato, amplifier envelope and other processors
       // that effect how voices start and turn into other notes.
-      void createArticulation(Output* note, Output* last_note, Output* velocity, Output* trigger);
+      void createArticulation(Output* note, Output* last_note, Output* velocity, Output* trigger, Output* channel);
 
       // Create the oscillators and hook up frequency controls.
       void createOscillators(Output* frequency, Output* reset);
@@ -104,6 +104,10 @@ namespace mopo {
       Multiply* output_;
 
       output_map poly_readouts_;
+      
+      Processor* current_note_;
+      Processor* current_channel_;
+      struct MTSClient *mtsClient;
   };
 } // namespace mopo
 

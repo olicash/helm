@@ -22,6 +22,7 @@
 #include "midi_lookup.h"
 #include "resonance_lookup.h"
 #include "processor.h"
+#include "../../src/MTS-ESP/libMTSClient.h"
 
 #define PROCESS_TICK_FUNCTION \
 void process() override { \
@@ -916,6 +917,25 @@ namespace mopo {
         inline void bufferTick(mopo_float* dest, const mopo_float* source, int i) {
           dest[i] = ResonanceLookup::qLookup(source[i]);
         }
+    };
+      
+    class MTS_ESP_Retune : public Operator {
+      public:
+          MTS_ESP_Retune(MTSClient *mtsc) : Operator(2, 1, true), mtsClient(mtsc) { }
+          
+          virtual Processor* clone() const override {
+              return new MTS_ESP_Retune(*this);
+          }
+          
+          void process() override {
+              tick(0);
+          }
+          
+          inline void tick(int i) override {
+              output()->buffer[0] = MTS_RetuningInSemitones(mtsClient, input(0)->at(i), input(1)->at(i));
+          }
+      private:
+          MTSClient *mtsClient;
     };
   } // namespace cr
 } // namespace mopo

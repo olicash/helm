@@ -21,6 +21,7 @@
 #include "mopo.h"
 #include "helm_common.h"
 #include "helm_module.h"
+#include "../MTS-ESP/libMTSClient.h"
 
 namespace mopo {
   class Arpeggiator;
@@ -82,6 +83,8 @@ namespace mopo {
       StepGenerator* step_sequencer_;
 
       std::set<ModulationConnection*> mod_connections_;
+      
+      MTSClient *mtsClient;
   };
 } // namespace mopo
 

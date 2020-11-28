@@ -92,9 +92,9 @@ namespace mopo {
     };
   } // namespace
 
-  HelmVoiceHandler::HelmVoiceHandler(Output* beats_per_second) :
+  HelmVoiceHandler::HelmVoiceHandler(Output* beats_per_second, MTSClient *mtsc) :
       ProcessorRouter(VoiceHandler::kNumInputs, 0), VoiceHandler(MAX_POLYPHONY),
-      beats_per_second_(beats_per_second) {
+      beats_per_second_(beats_per_second), mtsClient(mtsc) {
     output_ = new Multiply();
     registerOutput(output_->output());
   }
@@ -125,7 +125,7 @@ namespace mopo {
     mod_sources_["mod_wheel"] = choose_mod_wheel->output();
 
     // Create all synthesizer voice components.
-    createArticulation(note(), last_note(), velocity(), voice_event());
+    createArticulation(note(), last_note(), velocity(), voice_event(), channel());
     createOscillators(current_frequency_->output(),
                       amplitude_envelope_->output(Envelope::kFinished));
     createModulators(amplitude_envelope_->output(Envelope::kFinished));
@@ -155,11 +155,18 @@ namespace mopo {
     cr::Multiply* pitch_bend = new cr::Multiply();
     pitch_bend->plug(choose_pitch_wheel_, 0);
     pitch_bend->plug(pitch_bend_range, 1);
-    cr::Add* bent_midi = new cr::Add();
+      
+    cr::MTS_ESP_Retune *mts_esp_retune = new cr::MTS_ESP_Retune(mtsClient);
+    mts_esp_retune->plug(current_note_->output(), 0);
+    mts_esp_retune->plug(current_channel_->output(), 1);
+
+    cr::VariableAdd* bent_midi = new cr::VariableAdd(3);
     bent_midi->plug(midi, 0);
     bent_midi->plug(pitch_bend, 1);
+    bent_midi->plug(mts_esp_retune, 2);
 
     addProcessor(pitch_bend);
+    addProcessor(mts_esp_retune);
     addProcessor(bent_midi);
 
     // Oscillator 1.
@@ -629,7 +636,7 @@ namespace mopo {
   }
 
   void HelmVoiceHandler::createArticulation(
-      Output* note, Output* last_note, Output* velocity, Output* trigger) {
+      Output* note, Output* last_note, Output* velocity, Output* trigger, Output* channel) {
     // Legato.
     legato_ = createBaseControl("legato");
     LegatoFilter* legato_filter = new LegatoFilter();
@@ -664,6 +671,12 @@ namespace mopo {
     note_wait->plug(note_change_trigger, TriggerWait::kTrigger);
     current_note->plug(note_wait);
 
+    TriggerWait* channel_wait = new TriggerWait();
+    Value* current_channel = new Value();
+    channel_wait->plug(channel, TriggerWait::kWait);
+    channel_wait->plug(note_change_trigger, TriggerWait::kTrigger);
+    current_channel->plug(channel_wait);
+    
     static const cr::Value max_midi_invert(1.0 / (MIDI_SIZE - 1));
     cr::Multiply* note_percentage = new cr::Multiply();
     note_percentage->plug(&max_midi_invert, 0);
@@ -672,6 +685,10 @@ namespace mopo {
     addProcessor(note_change_trigger);
     addProcessor(note_wait);
     addProcessor(current_note);
+    addProcessor(current_channel);
+      
+    current_note_ = current_note;
+    current_channel_ = current_channel;
 
     // Key tracking.
     static const Value center_adjust(-MIDI_SIZE / 2);
